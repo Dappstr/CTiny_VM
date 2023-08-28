@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 unsigned int get_file_size(FILE *file) {
     if(!file) {
@@ -38,8 +39,160 @@ char* get_file_contents(const char* path) {
     return contents;
 }
 
+typedef struct Error{
+    enum ErrorType {
+        ERROR_NONE,
+        ERROR_ARGUMENTS,
+        ERROR_SYNTAX
+    } type;
+    char* msg;
+} Error;
+
+void print_error(Error err) {
+    printf("ERROR: ");
+    switch(err.type) {
+        case ERROR_NONE:
+            break;
+        case ERROR_ARGUMENTS:
+            printf("Invalid arguments");
+            break;
+        case ERROR_SYNTAX:
+            printf("Invalid syntax");
+            break;
+    }
+    putchar('\n');
+    printf("     :%s", err.msg);
+}
+
+#define ERROR_PREP(n, t, m)     \
+    (n).type = t;               \
+    (n).msg = m;
+
+Error ok = {ERROR_NONE, NULL};
+
+typedef enum TokenType {
+    INST,
+    NUM
+} Type;
+
+typedef enum Inst_type {
+    PUSH,
+    POP,
+    ADD,
+    MUL,
+    SUB,
+    HLT
+}Inst_type;
+
+typedef struct Token {
+    Type token_type;
+    char* beg;
+    char* end;
+    union {
+        Inst_type inst_type;
+        int value;
+    } val;
+    struct Token* next_token;
+} Token;
+
+const char* ws = " \r\n";
+const char* delims = " \r\n#";
+
+Error lex(char* src, Token* token) {
+    Error err = ok;
+    if(!src || !token) {
+        ERROR_PREP(err, ERROR_ARGUMENTS, "Cannot lex empty source\n");
+        return err;
+    }
+    token->beg = src;
+    token->beg += strspn(token->beg, ws);
+    
+    token->end = token->beg;
+    if(*token->end == '\0') {
+        return err;
+    }
+    
+    token->end += strcspn(token->beg, delims);
+    if(token->beg == token->end) {
+        token->end += 1;
+    }
+
+    return err;
+}
+
+Token* create_token() {
+    Token* token = malloc(sizeof(Token));
+    assert(token && "Failed to allocate memory for token");
+    memset(token, 0, sizeof(Token));
+    return token;
+}
+
+void print_tokens(Token* root) {
+    size_t num_tokens = 1;
+    while(root) {
+        printf("Token %zu: %.*s\n", num_tokens, (int)(root->end - root->beg), root->beg);
+        root = root->next_token;
+        ++num_tokens;
+    }
+}
+
+unsigned int num_tokens(Token* root) {
+    unsigned int num_tokens = 0;
+    while(root) {
+            ++num_tokens; 
+            root = root->next_token;
+        }
+    return num_tokens;
+}
+
 void print_usage(char* argv) {
     printf("USAGE: %s <path_to_file>\n", argv);
+}
+
+int token_str_cmp(char* str, Token* tok) {
+    if(!str || !tok) {
+        return 0;
+    }
+    char* beg = tok->beg;
+    while(beg < tok->end) {
+        if(*beg != *str) {
+            return 0;
+        }
+        ++beg;
+        ++str;
+    }
+    return 1;
+}
+
+Token* tokenize(Token* root, int token_num) {
+    Token* temp = root;
+    Token* tokens = malloc(sizeof(Token) * token_num);
+    for(int i = 0; i < token_num; ++i) {
+        memcpy(&tokens[i], temp, sizeof(Token));
+        if(token_str_cmp("push", &tokens[i])) {
+            tokens[i].token_type = INST;
+            tokens[i].val.inst_type = PUSH;
+        }
+        else if(token_str_cmp("pop", &tokens[i])) {
+            tokens[i].token_type = INST;
+            tokens[i].val.inst_type = POP;
+        }
+        else if(token_str_cmp("hlt", &tokens[i])) {
+            tokens[i].token_type = INST;
+            tokens[i].val.inst_type = HLT;
+        }
+        else if(token_str_cmp("mul", &tokens[i])) {
+            tokens[i].token_type = INST;
+            tokens[i].val.inst_type = MUL;
+        }
+        else if(token_str_cmp("#", &tokens[i])) {
+            tokens[i].token_type = NUM;
+            //Get the integer value of the next token which will be after "#"
+            tokens[i].val.value = atoi(temp->next_token->beg);
+        }
+        temp = temp->next_token;
+    }
+    return tokens;
 }
 
 int main(int argc, char* argv[]) {
@@ -54,9 +207,36 @@ int main(int argc, char* argv[]) {
     printf("Read: \n%s", contents);
 
     //lex
-    //char** lexemes = lex(contents);
+    Error err = ok;
 
-    //tokenize
+    Token* tokens = NULL;
+    Token* token_it = tokens;
+
+    Token current_token;
+    current_token.beg = contents;
+    current_token.end = contents;
+    current_token.next_token = NULL;
+
+    while((err = lex(current_token.end, &current_token)).type == ERROR_NONE) {
+        size_t token_size = current_token.end - current_token.beg;
+        if(token_size == 0) { break; }
+    
+        if(tokens) {
+            token_it->next_token = create_token();
+            memcpy(token_it->next_token, &current_token, sizeof(Token));
+            token_it = token_it->next_token;
+        }
+        else {
+            tokens = create_token();
+            memcpy(tokens, &current_token, sizeof(Token));
+            token_it = tokens;
+        }
+    }
+    print_tokens(tokens);
+   
+    //Tokenize
+    unsigned int token_count = num_tokens(tokens);
+    Token* token_arr = tokenize(tokens, token_count);
 
     //parse
 
