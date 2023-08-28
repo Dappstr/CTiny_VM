@@ -81,6 +81,7 @@ typedef enum Inst_type {
     ADD,
     MUL,
     SUB,
+    PRINT,
     HLT
 }Inst_type;
 
@@ -181,9 +182,21 @@ Token* tokenize(Token* root, int token_num) {
             tokens[i].token_type = INST;
             tokens[i].val.inst_type = HLT;
         }
+        else if(token_str_cmp("add", &tokens[i])) {
+            tokens[i].token_type = INST;
+            tokens[i].val.inst_type = ADD;
+        }
         else if(token_str_cmp("mul", &tokens[i])) {
             tokens[i].token_type = INST;
             tokens[i].val.inst_type = MUL;
+        }
+        else if(token_str_cmp("sub", &tokens[i])) {
+            tokens[i].token_type = INST;
+            tokens[i].val.inst_type = SUB;
+        }
+        else if(token_str_cmp("print", &tokens[i])) {
+            tokens[i].token_type = INST;
+            tokens[i].val.inst_type = PRINT;
         }
         else if(token_str_cmp("#", &tokens[i])) {
             tokens[i].token_type = NUM;
@@ -194,6 +207,80 @@ Token* tokenize(Token* root, int token_num) {
     }
     return tokens;
 }
+void parse(Token* tokens, int token_num, int* stack) {
+    int push_indx = 0;
+    for(int i = 0; i < token_num; ++i) {
+        if(tokens[i].token_type == INST) {
+            switch(tokens[i].val.inst_type) {
+                //Push an integer towards the tail of the stack
+                case PUSH:
+                    stack[push_indx] = tokens[i+1].val.value;
+                    push_indx++;
+                    stack = realloc(stack, sizeof(int) * (push_indx + 1));
+                    break;
+               
+                //Pop the tail value
+                case POP:
+                    if(push_indx > 0) {
+                        push_indx--;
+                        stack = realloc(stack, sizeof(int) * (push_indx - 1));
+                        
+                    }
+                      
+                    break;
+
+                case ADD: {
+                    int add = stack[0];
+                    if(push_indx > 1) {
+                        for(int x = 1; x < push_indx; ++x) {
+                            add += stack[x];
+                        }
+                    }
+                    printf("%d\n", add);
+                    break;
+                }
+                case SUB: {
+                    int sub = stack[0];
+                    if(push_indx > 1) {
+                        for(int x = 1; x < push_indx; ++x) {
+                            sub -= stack[x];
+                        }
+                    }
+                    printf("%d\n", sub);
+                }
+
+                case MUL: {
+                    int mul = stack[0];
+                    if(push_indx > 1) {
+                        for(int x = 1; x < push_indx; ++x) {
+                            mul *= stack[x];
+                        }
+                    }
+                    printf("%d\n", mul);
+                }
+
+
+                case PRINT:
+                    printf("[ ");
+                    for(int i = 0; i < push_indx; ++i) {
+                        if(i == push_indx - 1) {                            
+                            printf("%d ]\n", stack[i]);
+                            break;
+                        }
+                        else {
+                            printf("%d, ", stack[i]);
+                        }
+                    }
+                    break;
+                
+                case HLT:
+                    exit(EXIT_SUCCESS);
+            } 
+
+        }
+        
+    }
+}
 
 int main(int argc, char* argv[]) {
     if(argc < 2) {
@@ -203,8 +290,6 @@ int main(int argc, char* argv[]) {
     //get file contents
     char* path = argv[1];
     char* contents = get_file_contents(path);
-
-    printf("Read: \n%s", contents);
 
     //lex
     Error err = ok;
@@ -232,14 +317,17 @@ int main(int argc, char* argv[]) {
             token_it = tokens;
         }
     }
-    print_tokens(tokens);
    
     //Tokenize
     unsigned int token_count = num_tokens(tokens);
     Token* token_arr = tokenize(tokens, token_count);
 
     //parse
-
+    
+    //Assume there is at least one push instruction
+    //Maybe I'll change this in the future
+    int* stack = malloc(sizeof(int) * 1);
+    parse(token_arr, token_count, stack);
 
     return EXIT_SUCCESS;
 }
