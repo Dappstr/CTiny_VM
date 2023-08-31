@@ -207,53 +207,74 @@ Token* tokenize(Token* root, int token_num) {
     }
     return tokens;
 }
-void parse(Token* tokens, int token_num, int* stack) {
+void parse(Token* tokens, int token_num, int** stack) {
     int push_indx = 0;
     for(int i = 0; i < token_num; ++i) {
         if(tokens[i].token_type == INST) {
             switch(tokens[i].val.inst_type) {
                 //Push an integer towards the tail of the stack
                 case PUSH:
-                    stack[push_indx] = tokens[i+1].val.value;
+                    if(*stack == NULL) {
+                        *stack = malloc(sizeof(int) * 1);
+                        if(stack) {
+                            printf("Failed to allocate memory for stack\n");
+                            exit(EXIT_FAILURE);
+                        }
+                    }
+                    else {
+                        *stack = realloc(*stack, sizeof(int) * (push_indx + 1));
+                        if(!stack) {
+                            printf("Failed to reallocate memory for new stack item\n");
+                            exit(EXIT_FAILURE);
+                        }
+                    }
+                    (*stack)[push_indx] = tokens[i+1].val.value;
                     push_indx++;
-                    stack = realloc(stack, sizeof(int) * (push_indx + 1));
                     break;
                
                 //Pop the tail value
                 case POP:
                     if(push_indx > 0) {
                         push_indx--;
-                        stack = realloc(stack, sizeof(int) * (push_indx - 1));
-                        
+                        if(push_indx > 0) {
+                            *stack = realloc(*stack, sizeof(int) * (push_indx - 1));
+                            if(!stack) {
+                                printf("Memory reallocation for popping stack failed\n");
+                                exit(EXIT_FAILURE);
+                            }
+                        }
                     }
-                      
+                    else {
+                        free(*stack);
+                        *stack = NULL;
+                    }
                     break;
 
                 case ADD: {
-                    int add = stack[0];
+                    int add = (*stack)[0];
                     if(push_indx > 1) {
                         for(int x = 1; x < push_indx; ++x) {
-                            add += stack[x];
+                            add += (*stack)[x];
                         }
                     }
                     printf("%d\n", add);
                     break;
                 }
                 case SUB: {
-                    int sub = stack[0];
+                    int sub = (*stack)[0];
                     if(push_indx > 1) {
                         for(int x = 1; x < push_indx; ++x) {
-                            sub -= stack[x];
+                            sub -= (*stack)[x];
                         }
                     }
                     printf("%d\n", sub);
                 }
 
                 case MUL: {
-                    int mul = stack[0];
+                    int mul = (*stack)[0];
                     if(push_indx > 1) {
                         for(int x = 1; x < push_indx; ++x) {
-                            mul *= stack[x];
+                            mul *= (*stack)[x];
                         }
                     }
                     printf("%d\n", mul);
@@ -264,16 +285,17 @@ void parse(Token* tokens, int token_num, int* stack) {
                     printf("[ ");
                     for(int i = 0; i < push_indx; ++i) {
                         if(i == push_indx - 1) {                            
-                            printf("%d ]\n", stack[i]);
+                            printf("%d ]\n", (*stack)[i]);
                             break;
                         }
                         else {
-                            printf("%d, ", stack[i]);
+                            printf("%d, ", (*stack)[i]);
                         }
                     }
                     break;
                 
                 case HLT:
+                    free(*stack);
                     exit(EXIT_SUCCESS);
             } 
 
@@ -323,11 +345,8 @@ int main(int argc, char* argv[]) {
     Token* token_arr = tokenize(tokens, token_count);
 
     //parse
-    
-    //Assume there is at least one push instruction
-    //Maybe I'll change this in the future
-    int* stack = malloc(sizeof(int) * 1);
-    parse(token_arr, token_count, stack);
+    int* stack = NULL;
+    parse(token_arr, token_count, &stack);
 
     return EXIT_SUCCESS;
 }
