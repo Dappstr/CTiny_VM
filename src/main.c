@@ -72,7 +72,8 @@ Error ok = {ERROR_NONE, NULL};
 
 typedef enum TokenType {
     INST,
-    NUM
+    NUM,
+    VAR
 } Type;
 
 typedef enum Inst_type {
@@ -95,6 +96,14 @@ typedef struct Token {
     } val;
     struct Token* next_token;
 } Token;
+
+typedef struct Binding {
+    char* id;
+    int value;
+} Binding;
+
+int num_bindings;
+Binding* binds;
 
 const char* ws = " \r\n";
 const char* delims = " \r\n#";
@@ -198,6 +207,10 @@ Token* tokenize(Token* root, int token_num) {
             tokens[i].token_type = INST;
             tokens[i].val.inst_type = PRINT;
         }
+        else if(token_str_cmp("var", &tokens[i])) {
+            tokens[i].token_type = VAR;
+            tokens[i].val.value = atoi(temp->next_token->next_token->next_token->beg);
+        }
         else if(token_str_cmp("#", &tokens[i])) {
             tokens[i].token_type = NUM;
             //Get the integer value of the next token which will be after "#"
@@ -216,7 +229,7 @@ void parse(Token* tokens, int token_num, int** stack) {
                 case PUSH:
                     if(*stack == NULL) {
                         *stack = malloc(sizeof(int) * 1);
-                        if(stack) {
+                        if(!stack) {
                             printf("Failed to allocate memory for stack\n");
                             exit(EXIT_FAILURE);
                         }
@@ -251,6 +264,7 @@ void parse(Token* tokens, int token_num, int** stack) {
                     break;
 
                 case ADD: {
+                    if(!stack || push_indx < 1) { break; } 
                     int add = (*stack)[0];
                     if(push_indx > 1) {
                         for(int x = 1; x < push_indx; ++x) {
@@ -261,6 +275,7 @@ void parse(Token* tokens, int token_num, int** stack) {
                     break;
                 }
                 case SUB: {
+                    if(!stack || push_indx < 1) { break; }
                     int sub = (*stack)[0];
                     if(push_indx > 1) {
                         for(int x = 1; x < push_indx; ++x) {
@@ -269,8 +284,8 @@ void parse(Token* tokens, int token_num, int** stack) {
                     }
                     printf("%d\n", sub);
                 }
-
                 case MUL: {
+                    if(!stack || push_indx < 1) { break; }         
                     int mul = (*stack)[0];
                     if(push_indx > 1) {
                         for(int x = 1; x < push_indx; ++x) {
@@ -279,8 +294,6 @@ void parse(Token* tokens, int token_num, int** stack) {
                     }
                     printf("%d\n", mul);
                 }
-
-
                 case PRINT:
                     printf("[ ");
                     for(int i = 0; i < push_indx; ++i) {
@@ -293,12 +306,15 @@ void parse(Token* tokens, int token_num, int** stack) {
                         }
                     }
                     break;
-                
                 case HLT:
                     free(*stack);
                     exit(EXIT_SUCCESS);
             } 
 
+        }
+
+        else if(tokens[i].token_type == VAR) {
+            printf("Found var: %d", tokens[i].val.value);
         }
         
     }
