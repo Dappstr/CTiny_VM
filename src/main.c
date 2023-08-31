@@ -102,8 +102,21 @@ typedef struct Binding {
     int value;
 } Binding;
 
-int num_bindings;
-Binding* binds;
+char* process_id(Token* tok) {
+    int length = (int)(tok->end - tok->beg);
+    char* id = malloc(length + 1);
+    if(!id) {
+        printf("Failed to get identifier for variable\n");
+        exit(EXIT_FAILURE);
+    }
+    strncpy(id, tok->beg, length);
+    id[length] = '\0';
+    return id;
+}
+
+//Start off with no bindings
+int num_bindings = 0;
+Binding* binds = NULL;
 
 const char* ws = " \r\n";
 const char* delims = " \r\n#";
@@ -209,6 +222,7 @@ Token* tokenize(Token* root, int token_num) {
         }
         else if(token_str_cmp("var", &tokens[i])) {
             tokens[i].token_type = VAR;
+            tokens[i].beg = process_id(temp->next_token);
             tokens[i].val.value = atoi(temp->next_token->next_token->next_token->beg);
         }
         else if(token_str_cmp("#", &tokens[i])) {
@@ -314,7 +328,19 @@ void parse(Token* tokens, int token_num, int** stack) {
         }
 
         else if(tokens[i].token_type == VAR) {
-            printf("Found var: %d", tokens[i].val.value);
+            if(num_bindings < 1) {
+                binds = malloc(sizeof(Binding) + 1);
+                binds[0].value = tokens[i].val.value;
+                binds[0].id = tokens[i].beg;
+                num_bindings++;
+            }
+            else {
+                binds = realloc(binds, sizeof(Binding) * (num_bindings + 1));
+                binds[num_bindings].value = tokens[i].val.value;
+                binds[num_bindings].id = tokens[i].beg;
+                num_bindings++;
+            }
+            printf("Found var: %s %d\n",binds[num_bindings - 1].id, binds[num_bindings - 1].value);
         }
         
     }

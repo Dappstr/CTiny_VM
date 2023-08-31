@@ -1,8 +1,3 @@
-push #12
-push #10
-push #15
-print
-pop
-print
-add
+var a#12
+var b#10
 hlt
