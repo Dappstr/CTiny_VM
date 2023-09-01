@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <ctype.h>
 
 unsigned int get_file_size(FILE *file) {
     if(!file) {
@@ -118,6 +119,16 @@ char* process_id(Token* tok) {
 int num_bindings = 0;
 Binding* binds = NULL;
 
+int get_binding_value(const char* identifier) {
+    for(int i = 0; i < num_bindings; ++i) {
+        if(strcmp(binds[i].id, identifier) == 0) {
+            return binds[i].value;
+        }
+    }
+    printf("Failed to find %s\n", identifier);
+    exit(EXIT_FAILURE);
+}
+
 const char* ws = " \r\n";
 const char* delims = " \r\n#";
 
@@ -226,9 +237,23 @@ Token* tokenize(Token* root, int token_num) {
             tokens[i].val.value = atoi(temp->next_token->next_token->next_token->beg);
         }
         else if(token_str_cmp("#", &tokens[i])) {
-            tokens[i].token_type = NUM;
-            //Get the integer value of the next token which will be after "#"
-            tokens[i].val.value = atoi(temp->next_token->beg);
+            if(isdigit(*(temp->next_token->beg))) {
+                tokens[i].token_type = NUM;
+                tokens[i].val.value = atoi(temp->next_token->beg);
+            }
+            else {
+                tokens[i].token_type = VAR;
+                tokens[i].beg = process_id(temp->next_token);
+                
+                char* var_name = tokens[i].beg;
+                for(int j = 0; j < num_bindings; ++j) {
+                    if(strcmp(binds[j].id, var_name) == 0) {
+                        tokens[i].val.value = binds[j].value;
+                        break;
+                    }
+                }
+            }
+
         }
         temp = temp->next_token;
     }
@@ -255,7 +280,16 @@ void parse(Token* tokens, int token_num, int** stack) {
                             exit(EXIT_FAILURE);
                         }
                     }
-                    (*stack)[push_indx] = tokens[i+1].val.value;
+                    if(tokens[i + 1].token_type == NUM) {
+                        printf("Pushing number: %d\n", tokens[i+1].val.value);
+                        (*stack)[push_indx] = tokens[i+1].val.value;
+                    
+                    }
+                    else if(tokens[i + 1].token_type == VAR) {
+                        int bound_value = get_binding_value(tokens[i+1].beg);  
+                        printf("Pushing variable %d bound to %s\n", bound_value, tokens[i + 1].beg);
+                        (*stack)[push_indx] = bound_value;
+                    }
                     push_indx++;
                     break;
                
@@ -340,7 +374,6 @@ void parse(Token* tokens, int token_num, int** stack) {
                 binds[num_bindings].id = tokens[i].beg;
                 num_bindings++;
             }
-            printf("Found var: %s %d\n",binds[num_bindings - 1].id, binds[num_bindings - 1].value);
         }
         
     }

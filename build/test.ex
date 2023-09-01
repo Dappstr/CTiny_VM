@@ -1,3 +1,5 @@
 var a#12
-var b#10
+push #20
+push #a
+print
 hlt
